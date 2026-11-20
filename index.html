@@ -755,6 +755,7 @@ function bind(){
       else if (k === 'apiKey') S[k] = el.value.trim();
       else if (k === 'fxManual') S[k] = el.value.trim();
       else S[k] = parseNum(el.value);
+      if (k === 'sellBufPct') S.sellBufMig = 1; // 직접 고친 값은 이전 대상에서 제외
       saveS(); renderAll();
       if (k === 'refreshMin') schedule();
       if (k === 'apiKey'){ CACHE = CACHE ? Object.assign({}, CACHE, { hist: null }) : null; saveCache(); refresh(); }
