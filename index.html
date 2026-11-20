@@ -812,7 +812,17 @@ async function loadTwelve(){
 }
 
 // VIX · 환율 (실패해도 계속)
+// VIX: TradingView 스캐너(CORS 허용) → Yahoo 프록시 → Twelve Data 순으로 시도
+async function loadVixTV(){
+  const u = 'https://scanner.tradingview.com/symbol?symbol=CBOE%3AVIX&fields=close,change_abs,open,high,low';
+  const j = await getJSON(u);
+  const price = +j.close;
+  if (!isFinite(price) || price <= 0) throw new Error('VIX 응답 형식 오류');
+  const prevClose = isFinite(+j.change_abs) ? price - +j.change_abs : null;
+  return { price, prevClose, dayLow: isFinite(+j.low) ? +j.low : null, t: Date.now(), src: 'TradingView' };
+}
 async function loadVix(){
+  try { const q = await loadVixTV(); if (isFinite(q.price)) return q; } catch(e){}
   try { const v = await yahoo('^VIX', '5d'); const q = quoteFromBars(v); if (isFinite(q.price)) return Object.assign(q, { t: Date.now() }); } catch(e){}
   if (S.apiKey){ try { const q = tdQuote(await td('/quote', { symbol: 'VIX' })); if (isFinite(q.price)) return Object.assign(q, { t: Date.now() }); } catch(e){} }
   return null;
