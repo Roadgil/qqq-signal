@@ -154,7 +154,7 @@ details.card[open]>summary::after{content:"－"}
       <p class="big krw" id="dcaAmt">–</p>
       <p class="sub" id="dcaSub">–</p>
       <dl class="kv">
-        <div><dt>월 예산 ÷ 20거래일</dt><dd id="dcaMonthly">–</dd></div>
+        <div><dt>월 QLD 배정 <span class="muted">÷ 20거래일</span></dt><dd id="dcaMonthly">–</dd></div>
         <div><dt>QLD 현재가</dt><dd id="qldPrice">–</dd></div>
         <div><dt>환율</dt><dd id="fxNow">–</dd></div>
       </dl>
@@ -166,6 +166,7 @@ details.card[open]>summary::after{content:"－"}
       <p class="big" id="posNow">–</p>
       <p class="sub" id="posSub">–</p>
       <dl class="kv">
+        <div><dt>월 TQQQ 배정</dt><dd id="satBudget">–</dd></div>
         <div><dt>QQQ 현재가</dt><dd id="qqqPrice">–</dd></div>
         <div><dt>100일선</dt><dd id="ma100">–</dd></div>
         <div><dt>200일선</dt><dd id="ma200">–</dd></div>
@@ -201,7 +202,12 @@ details.card[open]>summary::after{content:"－"}
       <div class="field">
         <label for="s-monthly">월 적립 예산</label>
         <div class="inp"><span class="u">₩</span><input id="s-monthly" data-key="monthly" data-money inputmode="numeric" autocomplete="off"></div>
-        <span class="hint">20거래일로 나눠 매일 적립해요</span>
+        <span class="hint">QLD·TQQQ 두 축으로 나눠요</span>
+      </div>
+      <div class="field">
+        <label for="s-qldpct">QLD 코어 비중</label>
+        <div class="inp"><input id="s-qldpct" data-key="qldPct" inputmode="decimal"><span class="u2">%</span></div>
+        <span class="hint">나머지는 TQQQ 추세추종 몫</span>
       </div>
       <div class="field">
         <label for="s-days">한 달 거래일 수</label>
@@ -334,7 +340,7 @@ const LS = {
 
 // ── 설정 · 상태 ─────────────────────────────────────────
 const DEF = {
-  monthly: 2500000, days: 20, buyBufPct: 1, sellBufPct: 2,
+  monthly: 2500000, qldPct: 50, days: 20, buyBufPct: 1, sellBufPct: 2,
   apiKey: '587e3154ff54414f9a088de7988e8d58',
   refreshMin: 2, fxManual: ''
 };
@@ -498,8 +504,11 @@ function compute(){
   const q = CACHE && CACHE.quotes ? CACHE.quotes : {};
   const fx = (parseNum(S.fxManual) > 0 ? parseNum(S.fxManual) : (CACHE && CACHE.fx ? CACHE.fx.rate : null));
   const monthly = Math.max(0, parseNum(S.monthly) || DEF.monthly);
+  const qldPct = Math.min(100, Math.max(0, isFinite(parseNum(S.qldPct)) ? parseNum(S.qldPct) : DEF.qldPct));
   const days = Math.max(1, Math.round(parseNum(S.days) || DEF.days));
-  const daily = monthly / days;
+  const qldMonthly = monthly * qldPct / 100;
+  const satMonthly = monthly - qldMonthly;
+  const daily = qldMonthly / days;
   const hist = CACHE && CACHE.hist;
   let base = null, tr = null;
   if (hist && hist.bars && hist.bars.length >= 200){
@@ -507,7 +516,7 @@ function compute(){
     const price = q.QQQ && q.QQQ.price;
     if (isFinite(price) && price > 0) tr = C.judge(base, price, S.buyBufPct, S.sellBufPct, ST.trend);
   }
-  return { session, q, fx, monthly, days, daily, base, tr, demo: !(q.QQQ || hist) };
+  return { session, q, fx, monthly, qldPct, days, qldMonthly, satMonthly, daily, base, tr, demo: !(q.QQQ || hist) };
 }
 
 // ── 렌더 ───────────────────────────────────────────────
@@ -535,7 +544,7 @@ function renderCore(){
   let sub = `QLD ${M.days}거래일 균등 · 조건 없음`;
   if (qld && fx) sub = `QLD 약 ${(d / fx / qld.price).toFixed(2)}주 · 조건 없이 매일`;
   $('#dcaSub').innerHTML = esc(sub);
-  $('#dcaMonthly').innerHTML = krw(M.monthly) + `<span class="sm">÷ ${M.days}일</span>`;
+  $('#dcaMonthly').innerHTML = krw(M.qldMonthly) + `<span class="sm">예산 ${Math.round(M.qldPct)}% · ${M.days}일</span>`;
   $('#qldPrice').innerHTML = qld ? usd(qld.price) + (qld.changePct != null ? ` <span class="sm ${dirCls(qld.changePct)}">${pctF(qld.changePct)}</span>` : '') : '–';
   $('#fxNow').innerHTML = M.fx ? M.fx.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '원' + (parseNum(S.fxManual) > 0 ? '<span class="sm">수동</span>' : '') : '–';
 }
@@ -549,6 +558,7 @@ function renderSat(){
     $('#posNow').textContent = '–';
     $('#posSub').textContent = 'QQQ 일봉 200개를 받아야 100·200일선을 계산해요';
     $('#qqqPrice').textContent = q ? usd(q.price) : '–';
+    $('#satBudget').textContent = krw(M.satMonthly);
     $('#ma100').textContent = '–'; $('#ma200').textContent = '–';
     return;
   }
@@ -565,6 +575,7 @@ function renderSat(){
   else why = `직전 종가 ${usd(M.base.lastClose)} 기준`;
   $('#posSub').innerHTML = esc(why);
   $('#qqqPrice').innerHTML = q ? usd(q.price) + (q.changePct != null ? ` <span class="sm ${dirCls(q.changePct)}">${pctF(q.changePct)}</span>` : '') : '–';
+  $('#satBudget').innerHTML = krw(M.satMonthly) + `<span class="sm">${bull ? 'TQQQ로 투입' : 'SGOV에서 대기'}</span>`;
   $('#ma100').innerHTML = usd(tr.ma100) + `<span class="sm ${dirCls(tr.gapPct100)}">${pctF(tr.gapPct100)}</span>`;
   $('#ma200').innerHTML = usd(tr.ma200) + `<span class="sm ${dirCls(tr.gapPct)}">${pctF(tr.gapPct)}</span>`;
 }
@@ -618,6 +629,7 @@ function renderGauge(){
 function syncInputs(){
   const set = (sel, v) => { const el = $(sel); if (el && document.activeElement !== el) el.value = v; };
   set('#s-monthly', Math.round(parseNum(S.monthly)).toLocaleString('ko-KR'));
+  set('#s-qldpct', S.qldPct);
   set('#s-days', S.days);
   set('#s-buy', S.buyBufPct);
   set('#s-sell', S.sellBufPct);
@@ -741,7 +753,7 @@ function bind(){
   });
   $('#keyShow').addEventListener('click', () => { const i = $('#s-key'); i.type = i.type === 'password' ? 'text' : 'password'; $('#keyShow').textContent = i.type === 'password' ? '보기' : '숨기기'; });
   $('#btnRefresh').addEventListener('click', refresh);
-  $('#resetDefaults').addEventListener('click', () => { ['monthly','days','buyBufPct','sellBufPct','refreshMin'].forEach(k => S[k] = DEF[k]); saveS(); renderAll(); schedule(); toast('설정을 기본값으로 돌렸어요'); });
+  $('#resetDefaults').addEventListener('click', () => { ['monthly','qldPct','days','buyBufPct','sellBufPct','refreshMin'].forEach(k => S[k] = DEF[k]); saveS(); renderAll(); schedule(); toast('설정을 기본값으로 돌렸어요'); });
   $('#btnNotify').addEventListener('click', async () => {
     if (!('Notification' in window)) return;
     const b = $('#btnNotify'); b.disabled = true;
