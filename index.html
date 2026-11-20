@@ -692,6 +692,10 @@ const saveS = () => LS.set('qdca.settings', S);
 const saveST = () => LS.set('qdca.state', ST);
 const saveCache = () => LS.set('qdca.cache', CACHE);
 
+// ▼ 백그라운드 푸시 서버 주소: wrangler deploy 후 나온 주소로 바꾸세요 (끝에 / 없이)
+const PUSH_API = 'https://qqq-signal-push.yroad2944.workers.dev';
+const pushReady = () => !/YOUR-SUBDOMAIN/.test(PUSH_API);
+
 // ── 포맷 ─────────────────────────────────────────────
 const krw = x => '₩' + Math.round(x || 0).toLocaleString('ko-KR');
 const usd = x => '$' + (x || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1213,9 +1217,79 @@ function renderNotifyHint(){
   const h = $('#notifyHint'); const b = $('#btnNotify');
   if (!('Notification' in window)){ h.textContent = '이 브라우저는 알림을 지원하지 않아요'; b.disabled = true; return; }
   const p = Notification.permission;
+  b.disabled = false;
+  if (ST.pushEndpoint && p === 'granted'){
+    b.textContent = '백그라운드 푸시 끄기'; b.classList.remove('primary');
+    h.textContent = '백그라운드 푸시 연결됨 · 앱을 꺼도 장중(미국 09:30–16:15) 5분마다 서버가 확인해요';
+    return;
+  }
+  b.classList.add('primary');
+  if (pushReady()){
+    b.textContent = '백그라운드 푸시 켜기';
+    h.textContent = p === 'denied' ? '알림이 차단돼 있어요. 크롬 사이트 설정에서 알림을 허용해 주세요.' : '켜면 앱을 꺼도 서버가 신호를 보내 줘요';
+    return;
+  }
   b.textContent = p === 'granted' ? '알림 켜짐' : '푸시 알림 켜기';
   b.disabled = p === 'granted';
   h.textContent = p === 'denied' ? '알림이 차단돼 있어요. 브라우저 사이트 설정에서 허용해 주세요.' : p === 'granted' ? `앱이 열려 있는 동안 ${S.refreshMin > 0 ? S.refreshMin + '분마다' : '새로고침할 때'} 확인해서 알려 드려요` : '';
+}
+
+// ── 백그라운드 푸시 (Cloudflare Worker) ───────────────
+async function pushApi(path, body){
+  const r = await fetch(PUSH_API + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `푸시 서버 오류 (HTTP ${r.status})`);
+  return j;
+}
+// 서버가 알림 문구·중복 방지에 쓰는 값 (실행 완료 체크, 탄알 금액, 국면별 QLD 비중)
+function pushPrefs(){
+  return { done: ST.done, sellDone: ST.sellDone, reserveKRW: M ? Math.round(M.p.reserveKRW) : undefined, bullRatio: S.bullRatio, bearRatio: S.bearRatio };
+}
+const b64uToU8 = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); const bin = atob(s + '='.repeat((4 - s.length % 4) % 4)); return Uint8Array.from(bin, c => c.charCodeAt(0)); };
+async function enablePush(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('이 브라우저는 백그라운드 푸시를 지원하지 않아요 (안드로이드 크롬 권장)');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('알림 권한을 허용해야 해요');
+  await initSW();
+  const reg = await navigator.serviceWorker.ready;
+  const { publicKey } = await pushApi('/api/vapid');
+  const key = b64uToU8(publicKey);
+  let sub = await reg.pushManager.getSubscription();
+  if (sub){ // 서버 키가 바뀌었으면 다시 구독
+    const old = sub.options && sub.options.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
+    if (!old || old.length !== key.length || old.some((v, i) => v !== key[i])){ await sub.unsubscribe(); sub = null; }
+  }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  await pushApi('/api/subscribe', { subscription: sub.toJSON(), prefs: pushPrefs() });
+  ST.pushEndpoint = sub.endpoint; ST.pushSynced = C.sessionDate(new Date()); saveST();
+}
+async function disablePush(){
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    if (sub){ await pushApi('/api/unsubscribe', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+  } catch(e){}
+  ST.pushEndpoint = null; saveST();
+}
+let prefsT;
+function syncPrefs(){
+  if (!ST.pushEndpoint || !pushReady()) return;
+  clearTimeout(prefsT);
+  prefsT = setTimeout(() => pushApi('/api/prefs', { endpoint: ST.pushEndpoint, prefs: pushPrefs() })
+    .catch(e => { if (/찾지 못/.test(e.message)){ ST.pushEndpoint = null; saveST(); renderNotifyHint(); } }), 1500);
+}
+// 앱을 열 때: 구독이 살아 있는지 확인하고 하루 1번 서버에 다시 등록 (구독 주소가 바뀌는 경우 대비)
+async function checkPushSub(){
+  if (!ST.pushEndpoint || !pushReady() || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription();
+    if (!sub || Notification.permission !== 'granted'){ ST.pushEndpoint = null; saveST(); renderNotifyHint(); return; }
+    const today = C.sessionDate(new Date());
+    if (sub.endpoint !== ST.pushEndpoint || ST.pushSynced !== today){
+      await pushApi('/api/subscribe', { subscription: sub.toJSON(), prefs: pushPrefs() });
+      ST.pushEndpoint = sub.endpoint; ST.pushSynced = today; saveST();
+    }
+  } catch(e){}
+  renderNotifyHint();
 }
 async function notify(title, body, tag){
   let shown = false;
@@ -1236,9 +1310,12 @@ function checkSignals(){
   ST.lastRegime = M.p.regime;
   const cutoff = C.addDays(M.session, -40);
   for (const k of Object.keys(ST.sent)) if (k.length > 10 && k.slice(0, 10) < cutoff) delete ST.sent[k];
+  // 서버 푸시가 보내는 신호(탄알·돌파·리밸런싱·국면)는 앱에서 또 띄우지 않음
+  const SERVER_SIG = /:(w50|w100|w150|w200|w200b|brk|sell1|sell2|regime-(bull|bear))$/;
   for (const s of list){
     if (ST.sent[s.key]) continue;
     ST.sent[s.key] = Date.now();
+    if (ST.pushEndpoint && SERVER_SIG.test(s.key)) continue;
     notify(s.title, s.body, s.key);
   }
   saveST();
@@ -1258,7 +1335,7 @@ function bind(){
       else if (k === 'apiKey' || k === 'vixManual') S[k] = el.value.trim();
       else if (el.tagName === 'SELECT') S[k] = +el.value;
       else S[k] = parseNum(el.value);
-      saveS(); renderAll();
+      saveS(); renderAll(); syncPrefs();
       if (k === 'refreshMin') schedule();
     };
     el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', handler);
@@ -1267,7 +1344,7 @@ function bind(){
   $('#s-key').addEventListener('change', () => refresh());
   $('#keyShow').addEventListener('click', () => { const i = $('#s-key'); i.type = i.type === 'password' ? 'text' : 'password'; $('#keyShow').textContent = i.type === 'password' ? '보기' : '숨기기'; });
   $$('input[name=fxMode]').forEach(r => r.addEventListener('change', () => { S.fxMode = r.value; saveS(); renderAll(); }));
-  $$('input[name=holdCur]').forEach(r => r.addEventListener('change', () => { S.holdCur = r.value; saveS(); renderAll(); }));
+  $$('input[name=holdCur]').forEach(r => r.addEventListener('change', () => { S.holdCur = r.value; saveS(); renderAll(); syncPrefs(); }));
   $('#btnRefresh').addEventListener('click', refresh);
   $('#resetDefaults').addEventListener('click', () => { STRATEGY_KEYS.forEach(k => S[k] = DEF[k]); saveS(); renderAll(); toast('전략 설정을 기본값으로 돌렸어요'); });
 
@@ -1277,7 +1354,7 @@ function bind(){
       const v = a.dataset.act;
       if (v.startsWith('done:')) ST.done[v.slice(5)] = true;
       else if (v.startsWith('sell:')) ST.sellDone[v.slice(5)] = true;
-      saveST(); renderAll(); toast('완료로 체크했어요. 같은 알림은 다시 오지 않아요.');
+      saveST(); renderAll(); syncPrefs(); toast('완료로 체크했어요. 같은 알림은 다시 오지 않아요.');
       return;
     }
     const del = e.target.closest('[data-del]');
@@ -1289,12 +1366,12 @@ function bind(){
     }
     if (e.target.id === 'rsAsk'){ confirmReset = true; renderReserve(); return; }
     if (e.target.id === 'rsNo'){ confirmReset = false; renderReserve(); return; }
-    if (e.target.id === 'rsYes'){ ST.done = {}; confirmReset = false; saveST(); renderAll(); toast('새 분할매수 사이클을 시작했어요'); return; }
+    if (e.target.id === 'rsYes'){ ST.done = {}; confirmReset = false; saveST(); renderAll(); syncPrefs(); toast('새 분할매수 사이클을 시작했어요'); return; }
   });
   document.addEventListener('change', e => {
     const t = e.target;
-    if (t.matches('[data-done]')){ ST.done[t.dataset.done] = t.checked; saveST(); renderAll(); }
-    else if (t.matches('[data-sell]')){ ST.sellDone[t.dataset.sell] = t.checked; saveST(); renderAll(); }
+    if (t.matches('[data-done]')){ ST.done[t.dataset.done] = t.checked; saveST(); renderAll(); syncPrefs(); }
+    else if (t.matches('[data-sell]')){ ST.sellDone[t.dataset.sell] = t.checked; saveST(); renderAll(); syncPrefs(); }
   });
   $('#logAdd').addEventListener('click', () => {
     const n = parseNum($('#logAmt').value); const d = $('#logDate').value || M.session;
@@ -1304,12 +1381,26 @@ function bind(){
   $('#logAmt').addEventListener('blur', e => { const n = parseNum(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : ''; });
   $('#btnNotify').addEventListener('click', async () => {
     if (!('Notification' in window)) return;
-    await initSW();
-    const p = await Notification.requestPermission();
+    const b = $('#btnNotify'); b.disabled = true;
+    try {
+      if (!pushReady()){
+        await initSW();
+        const p = await Notification.requestPermission();
+        if (p === 'granted') notify('알림이 켜졌어요', '앱이 열려 있는 동안 신호를 알려 드려요', 'hello');
+      } else if (ST.pushEndpoint){
+        await disablePush(); toast('백그라운드 푸시를 껐어요');
+      } else {
+        await enablePush(); toast('백그라운드 푸시 연결 완료 — 테스트 알림으로 확인해 보세요');
+      }
+    } catch(e){ toast(e.message); }
     renderNotifyHint();
-    if (p === 'granted') notify('알림이 켜졌어요', '신호가 생기면 이렇게 알려 드려요', 'hello');
   });
-  $('#btnTest').addEventListener('click', () => {
+  $('#btnTest').addEventListener('click', async () => {
+    if (ST.pushEndpoint && pushReady()){
+      try { const r = await pushApi('/api/test', { endpoint: ST.pushEndpoint }); toast(r.ok ? '서버에서 테스트 푸시를 보냈어요' : `푸시 서비스 응답 ${r.status}`); }
+      catch(e){ toast(e.message); }
+      return;
+    }
     const s = C.signals(M.p, M.ind, {})[0];
     notify(s ? s.title : '테스트 알림', s ? s.body : `오늘 QLD ${krw(M.p.todayQld)} 매수 권장`, 'test');
   });
@@ -1326,7 +1417,7 @@ function schedule(){
 
 bind();
 renderAll();
-initSW();
+initSW().then(checkPushSub);
 schedule();
 refresh();
 })();
