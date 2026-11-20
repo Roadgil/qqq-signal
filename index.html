@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>심플 신호판 · QLD 매일 적립 + TQQQ 100·200일선</title>
-<meta name="description" content="QLD는 매일 무조건 적립, TQQQ는 QQQ 100·200일선(+1% 동시 돌파 / 200일선 −2% 이탈)만 따라가는 초심플 신호판">
+<meta name="description" content="QLD는 매일 무조건 적립, TQQQ는 QQQ 100·200일선(+1% 동시 돌파 / 200일선 −1% 이탈)만 따라가는 초심플 신호판">
 <meta name="theme-color" content="#0f1722">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -190,7 +190,7 @@ details.card[open]>summary::after{content:"－"}
     <dl class="kv">
       <div><dt>100일선 <span id="buyBufTxt">+1%</span> 기준가</dt><dd id="up100">–</dd></div>
       <div><dt>200일선 <span id="buyBufTxt2">+1%</span> 돌파가</dt><dd id="up200">–</dd></div>
-      <div><dt>200일선 <span id="sellBufTxt">−2%</span> 이탈가</dt><dd id="down200">–</dd></div>
+      <div><dt>200일선 <span id="sellBufTxt">−1%</span> 이탈가</dt><dd id="down200">–</dd></div>
       <div><dt>매수·보유 기준 <span class="muted">둘 다 넘어야</span></dt><dd id="buyLine">–</dd></div>
       <div><dt>지금 판정</dt><dd id="verdict">–</dd></div>
     </dl>
@@ -310,7 +310,7 @@ details.card[open]>summary::after{content:"－"}
 
   // 추세 판정: 100·200일선 모두 +버퍼 돌파 → 보유 / 200일선 −버퍼 이탈 → 대피 / 그 사이 → 직전 추세 유지
   function judge(base, price, buyBufPct, sellBufPct, prev) {
-    const up = (num(buyBufPct) ?? 1) / 100, dn = (num(sellBufPct) ?? 2) / 100;
+    const up = (num(buyBufPct) ?? 1) / 100, dn = (num(sellBufPct) ?? 1) / 100;
     const hi100 = base.ma100 * (1 + up), hi200 = base.ma200 * (1 + up), lo200 = base.ma200 * (1 - dn);
     let state, basis;
     if (price >= hi100 && price >= hi200) { state = 'bull'; basis = 'breakout'; }
@@ -340,7 +340,7 @@ const LS = {
 
 // ── 설정 · 상태 ─────────────────────────────────────────
 const DEF = {
-  monthly: 2500000, qldPct: 50, days: 20, buyBufPct: 1, sellBufPct: 2,
+  monthly: 2500000, qldPct: 50, days: 20, buyBufPct: 1, sellBufPct: 1,
   apiKey: '587e3154ff54414f9a088de7988e8d58',
   refreshMin: 2, fxManual: ''
 };
@@ -349,6 +349,14 @@ function firstRun(){
   const old = LS.get('qdca.settings', null);
   return old && isFinite(old.monthly) && old.monthly > 0 ? { monthly: old.monthly } : {};
 }
+// 예전 기본값으로 저장된 매도 버퍼(200일선 −2%)만 200일선 −1%로 한 번 옮깁니다.
+(function migrateSellBuf(){
+  const o = LS.get('qs2.settings', null);
+  if (!o || o.sellBufMig === 1) return;
+  if (o.sellBufPct === 2) o.sellBufPct = DEF.sellBufPct;
+  o.sellBufMig = 1;
+  LS.set('qs2.settings', o);
+})();
 let S = Object.assign({}, DEF, firstRun(), LS.get('qs2.settings', {}));
 let ST = Object.assign({ trend: null, trendDate: null, sent: {}, pushEndpoint: null, pushSynced: null }, LS.get('qs2.state', {}));
 let CACHE = LS.get('qs2.cache', null);
