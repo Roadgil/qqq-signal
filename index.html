@@ -544,7 +544,7 @@ function renderCore(){
   let sub = `QLD ${M.days}거래일 균등 · 조건 없음`;
   if (qld && fx) sub = `QLD 약 ${(d / fx / qld.price).toFixed(2)}주 · 조건 없이 매일`;
   $('#dcaSub').innerHTML = esc(sub);
-  $('#dcaMonthly').innerHTML = krw(M.qldMonthly) + `<span class="sm">예산 ${Math.round(M.qldPct)}% · ${M.days}일</span>`;
+  $('#dcaMonthly').innerHTML = krw(M.qldMonthly) + `<span class="sm">· 예산 ${Math.round(M.qldPct)}% · ${M.days}일</span>`;
   $('#qldPrice').innerHTML = qld ? usd(qld.price) + (qld.changePct != null ? ` <span class="sm ${dirCls(qld.changePct)}">${pctF(qld.changePct)}</span>` : '') : '–';
   $('#fxNow').innerHTML = M.fx ? M.fx.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '원' + (parseNum(S.fxManual) > 0 ? '<span class="sm">수동</span>' : '') : '–';
 }
@@ -575,7 +575,7 @@ function renderSat(){
   else why = `직전 종가 ${usd(M.base.lastClose)} 기준`;
   $('#posSub').innerHTML = esc(why);
   $('#qqqPrice').innerHTML = q ? usd(q.price) + (q.changePct != null ? ` <span class="sm ${dirCls(q.changePct)}">${pctF(q.changePct)}</span>` : '') : '–';
-  $('#satBudget').innerHTML = krw(M.satMonthly) + `<span class="sm">${bull ? 'TQQQ로 투입' : 'SGOV에서 대기'}</span>`;
+  $('#satBudget').innerHTML = krw(M.satMonthly) + `<span class="sm">· ${bull ? 'TQQQ로 투입' : 'SGOV에서 대기'}</span>`;
   $('#ma100').innerHTML = usd(tr.ma100) + `<span class="sm ${dirCls(tr.gapPct100)}">${pctF(tr.gapPct100)}</span>`;
   $('#ma200').innerHTML = usd(tr.ma200) + `<span class="sm ${dirCls(tr.gapPct)}">${pctF(tr.gapPct)}</span>`;
 }
@@ -634,6 +634,7 @@ function syncInputs(){
   set('#s-buy', S.buyBufPct);
   set('#s-sell', S.sellBufPct);
   set('#s-fx', S.fxManual ? parseNum(S.fxManual) : '');
+  set('#s-key', S.apiKey || '');
   const ref = $('#s-ref'); if (ref) ref.value = String(S.refreshMin);
   $('#fxHint').textContent = parseNum(S.fxManual) > 0 ? '직접 입력한 환율을 써요' : (CACHE && CACHE.fx ? `자동 ${CACHE.fx.rate.toLocaleString('ko-KR',{maximumFractionDigits:1})}원 · ${CACHE.fx.src}` : '비우면 자동 조회');
 }
