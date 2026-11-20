@@ -94,17 +94,17 @@ button{cursor:pointer}
 .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
 
 /* 게이지 */
-.gauge{position:relative;height:52px;margin:2px 0 0;overflow:hidden}
-.gauge .track{position:absolute;left:0;right:0;top:16px;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden}
+.gauge{position:relative;height:60px;margin:2px 0 0}
+.gauge .track{position:absolute;left:0;right:0;top:18px;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden}
 .zone{position:absolute;top:0;bottom:0}
 .zone.z-bear{background:color-mix(in srgb,var(--down) 42%,var(--surface-2))}
 .zone.z-wait{background:color-mix(in srgb,var(--warn) 22%,var(--surface-2))}
 .zone.z-bull{background:color-mix(in srgb,var(--accent) 42%,var(--surface-2))}
-.mark{position:absolute;top:8px;width:3px;height:30px;border-radius:2px;background:var(--ink);transform:translateX(-50%);
+.mark{position:absolute;top:11px;width:3px;height:28px;border-radius:2px;background:var(--ink);transform:translateX(-50%);
   transition:left .35s ease}
-.mark span{position:absolute;left:50%;top:-13px;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:600;
+.mark span{position:absolute;left:50%;top:-14px;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:600;
   background:var(--surface);padding:0 3px;white-space:nowrap}
-.tick{position:absolute;top:34px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:var(--mono)}
+.tick{position:absolute;top:38px;font-size:11px;color:var(--muted);white-space:nowrap;font-family:var(--mono)}
 @media (prefers-reduced-motion: reduce){.mark{transition:none}}
 .gauge-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:2px}
 .gauge-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
@@ -609,7 +609,7 @@ function renderGauge(){
   $('#up100').innerHTML = `${usd(tr.hi100)} <span class="sm">100일 ${usd(tr.ma100)}${pctF(tr.gapPct100) !== '–' ? ' · ' + pctF(tr.gapPct100, 1) : ''}</span>`;
   $('#up200').innerHTML = `${usd(tr.hi200)} <span class="sm">200일 ${usd(tr.ma200)} · ${pctF(tr.gapPct, 1)}</span>`;
   $('#down200').innerHTML = `${usd(tr.lo200)} <span class="sm">200일선 −${(+S.sellBufPct).toFixed(1)}%</span>`;
-  $('#buyLine').innerHTML = `${usd(tr.entry)} <span class="sm">${bind} 먼저 걸림</span>`;
+  $('#buyLine').innerHTML = `${usd(tr.entry)} <span class="sm">${bind} 기준이 더 높음</span>`;
   const v = tr.state === 'bull' ? 'TQQQ 보유' : 'SGOV 대피';
   $('#verdict').innerHTML = `<span class="${tr.state === 'bull' ? 'up' : 'down'}">${v}</span>` +
     (tr.basis === 'hold' ? ' <span class="sm">밴드 안 · 유지</span>' : '');
@@ -622,6 +622,7 @@ function syncInputs(){
   set('#s-buy', S.buyBufPct);
   set('#s-sell', S.sellBufPct);
   set('#s-fx', S.fxManual ? parseNum(S.fxManual) : '');
+  const ref = $('#s-ref'); if (ref) ref.value = String(S.refreshMin);
   $('#fxHint').textContent = parseNum(S.fxManual) > 0 ? '직접 입력한 환율을 써요' : (CACHE && CACHE.fx ? `자동 ${CACHE.fx.rate.toLocaleString('ko-KR',{maximumFractionDigits:1})}원 · ${CACHE.fx.src}` : '비우면 자동 조회');
 }
 function renderAll(){
