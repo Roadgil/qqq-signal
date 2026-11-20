@@ -1,5 +1,5 @@
-/* QQQ 적립 신호판 — 서비스 워커: 앱 화면 캐시 + 백그라운드 푸시 수신 + 알림 클릭 */
-const CACHE = 'qdca-v2';
+/* 심플 신호판(QLD 적립 + TQQQ 100·200일선) — 서비스 워커: 화면 캐시 + 푸시 수신 + 알림 클릭 */
+const CACHE = 'qs2-v1';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -25,10 +25,10 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
-  const title = d.title || 'QQQ 적립 신호';
+  const title = d.title || '심플 신호판';
   e.waitUntil(self.registration.showNotification(title, {
-    body: d.body || '앱을 열어 오늘의 액션을 확인하세요',
-    tag: d.tag || 'qqq-signal',
+    body: d.body || '앱을 열어 추세 판정을 확인하세요',
+    tag: d.tag || 'qqq-simple',
     icon: 'icon-192.png',
     badge: 'icon-192.png',
     vibrate: [120, 60, 120],
