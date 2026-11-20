@@ -569,8 +569,9 @@ function renderSat(){
   $('#posNow').textContent = bull ? 'TQQQ 보유' : 'SGOV 대피';
   const p = q ? q.price : null;
   let why;
-  if (tr.basis === 'breakout') why = `QQQ ${usd(p)} ≥ 100·200일선 +1% 기준 ${usd(tr.entry)}`;
-  else if (tr.basis === 'breakdown') why = `QQQ ${usd(p)} ≤ 200일선 −2% 이탈가 ${usd(tr.lo200)}`;
+  const upTxt = (isFinite(+S.buyBufPct) && +S.buyBufPct < 0 ? '−' : '+') + Math.abs(+S.buyBufPct || 0) + '%';
+  if (tr.basis === 'breakout') why = `QQQ ${usd(p)} ≥ 100·200일선 ${upTxt} 기준 ${usd(tr.entry)}`;
+  else if (tr.basis === 'breakdown') why = `QQQ ${usd(p)} ≤ 200일선 −${Math.abs(+S.sellBufPct || 0)}% 이탈가 ${usd(tr.lo200)}`;
   else if (tr.basis === 'hold') why = `관망 구간(${usd(tr.lo200)} ~ ${usd(tr.entry)}) — 직전 추세 유지`;
   else why = `직전 종가 ${usd(M.base.lastClose)} 기준`;
   $('#posSub').innerHTML = esc(why);
