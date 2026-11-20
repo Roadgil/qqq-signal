@@ -540,7 +540,7 @@ details.card[open]>summary::after{content:"－"}
     out.daysLeft = tradingDaysLeftInMonth(ctx.session);
     out.daysInMonth = tradingDaysInMonth(ctx.session);
     out.baseNominal = out.monthlyQld / 20;
-    out.base = out.daysLeft > 0 ? out.remain / out.daysLeft : 0;
+    out.base = out.baseNominal;
 
     // 3) 오늘의 강도
     const vix = ctx.vix;
