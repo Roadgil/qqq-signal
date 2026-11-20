@@ -351,7 +351,6 @@ details.card[open]>summary::after{content:"－"}
       <div class="field"><label for="s-g1">1차 과열: 50주선 +</label><div class="inp"><input id="s-g1" data-key="sell1Gap" inputmode="decimal"><span class="u2">%</span></div></div>
       <div class="field"><label for="s-p1">1차 익절 비율 (레버리지 평가액의)</label><div class="inp"><input id="s-p1" data-key="sell1Pct" inputmode="decimal"><span class="u2">%</span></div></div>
       <div class="field"><label for="s-g2">2차 과열: 50주선 +</label><div class="inp"><input id="s-g2" data-key="sell2Gap" inputmode="decimal"><span class="u2">%</span></div></div>
-      <div class="field"><label for="s-am">정기 리밸런싱 월</label><div class="inp"><select id="s-am" data-key="annualMonth"></select></div></div>
     </div>
     <button class="btn small" id="resetDefaults" type="button" style="align-self:flex-start">전략 설정 기본값으로</button>
   </details>
@@ -361,11 +360,11 @@ details.card[open]>summary::after{content:"－"}
     <div class="field">
       <label for="s-key">Twelve Data API 키 (선택)</label>
       <div class="inp"><input id="s-key" data-key="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="없으면 Yahoo 시세로 동작"><button class="x" type="button" id="keyShow">보기</button></div>
-      <span class="hint">twelvedata.com 무료 가입 → API Keys에서 복사. 키는 이 기기 브라우저에만 저장돼요. 무료 한도: 분당 8회, 하루 800회 (새로고침 1번에 3~5회 사용).</span>
+      <span class="hint">기본 키가 내장되어 있어요(그대로 두면 됨). 직접 입력하면 이 기기 브라우저 값이 우선합니다. 무료 한도: 분당 8회, 하루 800회 (새로고침 1번에 3~5회 사용).</span>
     </div>
     <div class="grid2">
       <div class="field"><label for="s-ref">자동 새로고침</label><div class="inp"><select id="s-ref" data-key="refreshMin">
-        <option value="5">5분마다</option><option value="10">10분마다</option><option value="15">15분마다</option><option value="30">30분마다</option><option value="60">60분마다</option><option value="0">끄기</option></select></div></div>
+        <option value="1">1분 (실시간)</option><option value="2">2분</option><option value="5">5분마다</option><option value="10">10분마다</option><option value="15">15분마다</option><option value="30">30분마다</option><option value="60">60분마다</option><option value="0">끄기</option></select></div></div>
       <div class="field"><label for="s-vixm">VIX 수동값 (자동 조회 실패 시)</label><div class="inp"><input id="s-vixm" data-key="vixManual" inputmode="decimal" placeholder="예: 21.5"></div></div>
     </div>
     <div class="row">
@@ -622,15 +621,6 @@ details.card[open]>summary::after{content:"－"}
     out.rebal.active1 = out.rebal.hit1 && !out.rebal.hit2 && !out.rebal.done1 && r1.total > 0;
     out.rebal.active2 = out.rebal.hit2 && !out.rebal.done2 && r2.total > 0;
 
-    // 연 1회 정기 리밸런싱
-    const year = ctx.session.slice(0, 4);
-    const due = `${year}-${String(s.annualMonth).padStart(2, '0')}-01`;
-    const annualDone = st.annualDoneYear === year;
-    const diff = s.cashTarget / 100 * total - reserve; // + 면 레버리지 매도, - 면 레버리지 매수
-    out.annual = {
-      due, done: annualDone, active: ctx.session >= due && !annualDone && total > 0,
-      diff: Math.round(diff), action: diff > 0 ? 'sell' : 'buy', split: diff > 0 ? sellSplit(diff) : null
-    };
     return out;
   }
 
@@ -644,7 +634,6 @@ details.card[open]>summary::after{content:"－"}
     if (p.breakout.active) list.push({ key: `${day}:brk`, title: 'QQQ 100·200일선 동시 돌파', body: `남은 탄알 ₩${p.breakout.amount.toLocaleString('ko-KR')} 전액 TQQQ 투입` });
     if (p.rebal.active2) list.push({ key: `${day}:sell2`, title: `2차 과열 · 50주선 +${p.rebal.gap50.toFixed(1)}%`, body: `레버리지 ₩${p.rebal.sell2.total.toLocaleString('ko-KR')} 매도 → 목표 현금 비중 회복` });
     else if (p.rebal.active1) list.push({ key: `${day}:sell1`, title: `1차 과열 · 50주선 +${p.rebal.gap50.toFixed(1)}%`, body: `레버리지 ₩${p.rebal.sell1.total.toLocaleString('ko-KR')} 익절 → SGOV 보충` });
-    if (p.annual.active) list.push({ key: `${day.slice(0, 4)}:annual`, title: '연 1회 정기 리밸런싱 체크', body: '목표 현금 비중과 실제 비중을 맞춰 보세요' });
     return list;
   }
 
@@ -683,14 +672,14 @@ const LS = {
 };
 
 const DEF = {
-  apiKey:'', monthly:2500000, holdCur:'KRW', reserve:10000000, qldHold:0, tqqqHold:0,
+  apiKey:'587e3154ff54414f9a088de7988e8d58', monthly:2500000, holdCur:'KRW', reserve:10000000, qldHold:0, tqqqHold:0,
   fxMode:'auto', fxManual:1400, vixManual:'',
   bullRatio:60, bearRatio:80, rsiLow:40, rsiHigh:70, dropPct:2, vix1:25, vix2:30, mult1:2, mult2:2.5,
   bufOn:true, bufPct:1, lookback:10,
-  cashTarget:30, sell1Gap:15, sell2Gap:20, sell1Pct:10, annualMonth:12,
-  refreshMin:10
+  cashTarget:30, sell1Gap:15, sell2Gap:20, sell1Pct:10,
+  refreshMin:2
 };
-const STRATEGY_KEYS = ['bullRatio','bearRatio','rsiLow','rsiHigh','dropPct','vix1','vix2','mult1','mult2','bufOn','bufPct','lookback','cashTarget','sell1Gap','sell2Gap','sell1Pct','annualMonth'];
+const STRATEGY_KEYS = ['bullRatio','bearRatio','rsiLow','rsiHigh','dropPct','vix1','vix2','mult1','mult2','bufOn','bufPct','lookback','cashTarget','sell1Gap','sell2Gap','sell1Pct'];
 let S = Object.assign({}, DEF, LS.get('qdca.settings', {}));
 let ST = Object.assign({ done:{}, sellDone:{}, annualDoneYear:null, logs:[], sent:{}, lastRegime:null, proxy:0 }, LS.get('qdca.state', {}));
 let CACHE = LS.get('qdca.cache', null);
@@ -933,8 +922,6 @@ function renderHero(){
     acts.push(actItem('sell', '2차 익절', `레버리지 ${krw(p.rebal.sell2.total)} 매도 → SGOV`, splitText(p.rebal.sell2) + ` · 50주선 ${pct(p.rebal.gap50)}`, 'sell:s2'));
   else if (p.rebal.active1)
     acts.push(actItem('sell', '1차 익절', `레버리지 ${krw(p.rebal.sell1.total)} 익절 → SGOV`, splitText(p.rebal.sell1) + ` · 50주선 ${pct(p.rebal.gap50)}`, 'sell:s1'));
-  if (p.annual.active)
-    acts.push(actItem('sell', '정기 점검', '연 1회 리밸런싱 체크', p.annual.diff > 0 ? `현금 비중 회복: 레버리지 ${krw(p.annual.diff)} 매도` : `현금 초과: 레버리지 ${krw(-p.annual.diff)} 매수 여력`, 'annual'));
   if (!acts.length){
     const nt = p.nextTranche;
     const msg = p.breakout.done && p.reserveLeft === 0 ? '이번 사이클 탄알을 모두 썼어요'
@@ -1118,9 +1105,6 @@ function renderTable(){
   const w50 = M.ind.w50;
   h += splitRow(`1차 익절 ${S.sell1Pct}%`, `QQQ ≥ ${w50 ? usd(w50 * (1 + S.sell1Gap / 100)) : '–'} (50주 +${S.sell1Gap}%)`, r.sell1, r.active1, r.done1);
   h += splitRow('2차 · 목표 비중 회복', `QQQ ≥ ${w50 ? usd(w50 * (1 + S.sell2Gap / 100)) : '–'} (50주 +${S.sell2Gap}%)`, r.sell2, r.active2, r.done2);
-  const a = p.annual;
-  if (a.diff > 0) h += splitRow('연 1회 정기 점검', `${+a.due.slice(5, 7)}월 · 레버리지 매도로 목표 비중`, a.split, a.active, a.done);
-  else h += `<tr class="${a.done ? 'done' : a.active ? 'on' : ''}"><td>연 1회 정기 점검<span class="c2">${+a.due.slice(5, 7)}월 · 현금이 목표보다 많음</span></td><td class="num">${krw(-a.diff)}</td><td class="num">${usd(toUSD(-a.diff))}</td><td class="num">레버리지 매수 여력</td><td>${st(a.active, a.done)}</td></tr>`;
   h += '</tbody>';
   $('#tbl').innerHTML = h;
   $('#tbSub').textContent = `환율 ${M.fx.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}원 · 소수점 주수`;
@@ -1175,14 +1159,12 @@ function renderRebal(){
   const stat = (k, v) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   $('#rbStats').innerHTML = stat('총 평가액', krw(r.total)) + stat('현금 비중', `${(r.cashRatio * 100).toFixed(1)}%`) +
     stat('목표 비중', `${S.cashTarget}%`) + stat('목표까지', r.targetGap > 0 ? krw(r.targetGap) : '충족');
-  const a = p.annual;
   const ck = (attr, title, sub, amt, on, done) => `
     <label class="ck ${done ? 'is-done' : on ? 'is-on' : ''}"><input type="checkbox" ${attr} ${done ? 'checked' : ''}>
       <span class="t">${title}${on && !done ? ' <span class="chip hit">지금</span>' : ''}<small>${sub}</small></span><span class="a">${amt}</span></label>`;
   $('#rbChecks').innerHTML =
     ck('data-sell="s1"', `1차 과열 · 50주 +${S.sell1Gap}%`, splitText(r.sell1), krw(r.sell1.total), r.active1, r.done1) +
-    ck('data-sell="s2"', `2차 과열 · 50주 +${S.sell2Gap}%`, splitText(r.sell2), krw(r.sell2.total), r.active2, r.done2) +
-    ck('data-annual', `${a.due.slice(0, 4)}년 정기 리밸런싱 (${+a.due.slice(5, 7)}월~)`, a.diff > 0 ? '레버리지 매도로 목표 현금 비중 회복' : '현금이 목표보다 많으면 레버리지 매수 여력', krw(Math.abs(a.diff)), a.active, a.done);
+    ck('data-sell="s2"', `2차 과열 · 50주 +${S.sell2Gap}%`, splitText(r.sell2), krw(r.sell2.total), r.active2, r.done2);
   if (r.total === 0) $('#rbChecks').insertAdjacentHTML('beforeend', '<p class="hint" style="margin:6px 0 0">위 ‘내 입력값’에 대기 현금과 QLD·TQQQ 평가액을 넣으면 매도 금액이 계산돼요.</p>');
 }
 
@@ -1259,7 +1241,6 @@ function toast(msg){
 
 // ── 이벤트 ───────────────────────────────────────────
 function bind(){
-  const am = $('#s-am'); am.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}월</option>`).join('');
   $$('[data-key]').forEach(el => {
     const k = el.dataset.key;
     const handler = () => {
@@ -1286,7 +1267,6 @@ function bind(){
       const v = a.dataset.act;
       if (v.startsWith('done:')) ST.done[v.slice(5)] = true;
       else if (v.startsWith('sell:')) ST.sellDone[v.slice(5)] = true;
-      else if (v === 'annual') ST.annualDoneYear = M.session.slice(0, 4);
       saveST(); renderAll(); toast('완료로 체크했어요. 같은 알림은 다시 오지 않아요.');
       return;
     }
@@ -1305,7 +1285,6 @@ function bind(){
     const t = e.target;
     if (t.matches('[data-done]')){ ST.done[t.dataset.done] = t.checked; saveST(); renderAll(); }
     else if (t.matches('[data-sell]')){ ST.sellDone[t.dataset.sell] = t.checked; saveST(); renderAll(); }
-    else if (t.matches('[data-annual]')){ ST.annualDoneYear = t.checked ? M.session.slice(0, 4) : null; saveST(); renderAll(); }
   });
   $('#logAdd').addEventListener('click', () => {
     const n = parseNum($('#logAmt').value); const d = $('#logDate').value || M.session;
