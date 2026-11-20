@@ -188,9 +188,9 @@ details.card[open]>summary::after{content:"－"}
       <span><i style="background:color-mix(in srgb,var(--accent) 42%,var(--surface-2))"></i>보유 (TQQQ)</span>
     </div>
     <dl class="kv">
-      <div><dt>100일선 +<span id="buyBufTxt">1</span>% 기준가</dt><dd id="up100">–</dd></div>
-      <div><dt>200일선 +<span id="buyBufTxt2">1</span>% 돌파가</dt><dd id="up200">–</dd></div>
-      <div><dt>200일선 −<span id="sellBufTxt">2</span>% 이탈가</dt><dd id="down200">–</dd></div>
+      <div><dt>100일선 <span id="buyBufTxt">+1%</span> 기준가</dt><dd id="up100">–</dd></div>
+      <div><dt>200일선 <span id="buyBufTxt2">+1%</span> 돌파가</dt><dd id="up200">–</dd></div>
+      <div><dt>200일선 <span id="sellBufTxt">−2%</span> 이탈가</dt><dd id="down200">–</dd></div>
       <div><dt>매수·보유 기준 <span class="muted">둘 다 넘어야</span></dt><dd id="buyLine">–</dd></div>
       <div><dt>지금 판정</dt><dd id="verdict">–</dd></div>
     </dl>
@@ -582,9 +582,10 @@ function renderSat(){
 
 function renderGauge(){
   const tr = M.tr;
-  $('#buyBufTxt').textContent = String(S.buyBufPct);
-  $('#buyBufTxt2').textContent = String(S.buyBufPct);
-  $('#sellBufTxt').textContent = String(S.sellBufPct);
+  const pctSign = (v, sign) => { const n = Math.abs(isFinite(+v) ? +v : 0); return sign + (Number.isInteger(n) ? n : n.toFixed(1)) + '%'; };
+  $('#buyBufTxt').textContent = pctSign(S.buyBufPct, isFinite(+S.buyBufPct) && +S.buyBufPct < 0 ? '−' : '+');
+  $('#buyBufTxt2').textContent = pctSign(S.buyBufPct, isFinite(+S.buyBufPct) && +S.buyBufPct < 0 ? '−' : '+');
+  $('#sellBufTxt').textContent = pctSign(S.sellBufPct, '−');
   if (!tr){
     $('#gaugeSub').textContent = '–';
     ['#up100','#up200','#down200','#buyLine','#verdict'].forEach(x => $(x).textContent = '–');
